@@ -736,7 +736,9 @@ if (rc /= ESMF_SUCCESS) write(0,*) 'rc=',rc,__FILE__,__LINE__; if(ESMF_LogFoundE
 
       call update_atmos_model_dynamics (atm_int_state%Atm)
 
+#ifndef SW_DYNAMICS
       call update_atmos_radiation_physics (atm_int_state%Atm)
+#endif
 
       call atmos_model_exchange_phase_1 (atm_int_state%Atm, rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return

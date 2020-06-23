@@ -207,6 +207,7 @@ contains
     integer :: omp_get_thread_num, get_cpu_affinity, base_cpu
 !-----------------------------------------------------------------------
 !----- initialization timing identifiers ----
+!hj if (mpp_pe() == mpp_root_pe()) write(6,*) "coupler_init: enter "
 
 !----- read namelist -------
 !----- for backwards compatibilty read from file coupler.nml -----
@@ -430,6 +431,7 @@ if (restart_days > 0 .or. restart_secs > 0) intrm_rst = .true.
       endif
 
 !-----------------------------------------------------------------------
+!hj if (mpp_pe() == mpp_root_pe()) write(6,*) "coupler_init: end "
 
    end subroutine coupler_init
 
@@ -439,6 +441,7 @@ if (restart_days > 0 .or. restart_secs > 0) intrm_rst = .true.
 
     integer :: unit, date(6)
 
+!hj if (mpp_pe() == mpp_root_pe()) write(6,*) "coupler_res: enter "
 !----- compute current date ------
 
       call get_date (Time_atmos, date(1), date(2), date(3),  &
@@ -457,6 +460,7 @@ if (restart_days > 0 .or. restart_secs > 0) intrm_rst = .true.
              'Current model time: year, month, day, hour, minute, second'
         call mpp_close(unit)
     endif
+!hj if (mpp_pe() == mpp_root_pe()) write(6,*) "coupler_res: end "
    end subroutine coupler_res
 
 !#######################################################################
@@ -465,6 +469,7 @@ if (restart_days > 0 .or. restart_secs > 0) intrm_rst = .true.
 
    integer :: unit, date(6)
 !-----------------------------------------------------------------------
+!hj if (mpp_pe() == mpp_root_pe()) write(6,*) "coupler_end: enter "
 
       call atmos_model_end (Atm)
 
@@ -497,6 +502,7 @@ if (restart_days > 0 .or. restart_secs > 0) intrm_rst = .true.
    call diag_manager_end (Time_atmos)
 
 !-----------------------------------------------------------------------
+!hj if (mpp_pe() == mpp_root_pe()) write(6,*) "coupler_end: end "
 
    end subroutine coupler_end
 

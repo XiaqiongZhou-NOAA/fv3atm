@@ -265,6 +265,8 @@ subroutine update_atmos_radiation_physics (Atmos)
     integer :: ierr
 #endif
 
+!hj if (mpp_pe() == mpp_root_pe()) write(6,*) "update_atmos_radiation_physics: enter "
+
 #ifdef OPENMP
     nthrds = omp_get_max_threads()
 #else
@@ -280,6 +282,7 @@ subroutine update_atmos_radiation_physics (Atmos)
     call mpp_clock_end(getClock)
 
 !--- if dycore only run, set up the dummy physics output state as the input state
+!hj if (mpp_pe() == mpp_root_pe()) write(6,*) "dycore_only=",dycore_only
     if (dycore_only) then
       do nb = 1,Atm_block%nblks
         IPD_Data(nb)%Stateout%gu0 = IPD_Data(nb)%Statein%ugrs
@@ -307,11 +310,11 @@ subroutine update_atmos_radiation_physics (Atmos)
 #endif
 
 !--- call stochastic physics pattern generation / cellular automata
-    if (IPD_Control%do_sppt .OR. IPD_Control%do_shum .OR. IPD_Control%do_skeb .OR. IPD_Control%do_sfcperts) then
+      if (IPD_Control%do_sppt .OR. IPD_Control%do_shum .OR. IPD_Control%do_skeb .OR. IPD_Control%do_sfcperts) then
        call run_stochastic_physics(IPD_Control, IPD_Data(:)%Grid, IPD_Data(:)%Coupling, nthrds)
-    end if
+      end if
 
-    if(IPD_Control%do_ca)then
+      if(IPD_Control%do_ca)then
        ! DH* The current implementation of cellular_automata assumes that all blocksizes are the
        ! same, this is tested in the initialization call to cellular_automata, no need to redo *DH
        call cellular_automata(IPD_Control%kdt, IPD_Data(:)%Statein, IPD_Data(:)%Coupling, IPD_Data(:)%Intdiag, &
@@ -320,7 +323,7 @@ subroutine update_atmos_radiation_physics (Atmos)
                               IPD_Control%nthresh, IPD_Control%ca_global, IPD_Control%ca_sgs,                  &
                               IPD_Control%iseed_ca, IPD_Control%ca_smooth, IPD_Control%nspinup,                &
                               Atm_block%blksz(1))
-    endif
+      endif
 
 !--- if coupled, assign coupled fields
       if( IPD_Control%cplflx .or. IPD_Control%cplwav ) then
@@ -420,6 +423,7 @@ subroutine update_atmos_radiation_physics (Atmos)
     IPD_Control%first_time_step = .false.
 #endif
 !-----------------------------------------------------------------------
+!hj if (mpp_pe() == mpp_root_pe() ) write(6,*) "update_atmos_radiation_physics: end "
  end subroutine update_atmos_radiation_physics
 ! </SUBROUTINE>
 
@@ -465,6 +469,7 @@ subroutine atmos_model_init (Atmos, Time_init, Time, Time_step)
   integer :: nthrds
 
 !-----------------------------------------------------------------------
+!hj if (mpp_pe() == mpp_root_pe() ) write(6,*) "atmos_model_init: enter"
 
 !---- set the atmospheric model time ------
 
@@ -485,10 +490,12 @@ subroutine atmos_model_init (Atmos, Time_init, Time, Time_step)
                          Atmos%grid, Atmos%area)
 #endif
 
+!hj   if (mpp_pe() == mpp_root_pe()) write(6,*) "before check input.nml"
    IF ( file_exist('input.nml')) THEN
 #ifdef INTERNAL_FILE_NML
       read(input_nml_file, nml=atmos_model_nml, iostat=io)
       ierr = check_nml_error(io, 'atmos_model_nml')
+!hj    if (mpp_pe() == mpp_root_pe()) write(6,nml=atmos_model_nml)
 #else
       unit = open_namelist_file ( )
       ierr=1
@@ -496,9 +503,11 @@ subroutine atmos_model_init (Atmos, Time_init, Time, Time_step)
          read  (unit, nml=atmos_model_nml, iostat=io, end=10)
          ierr = check_nml_error(io,'atmos_model_nml')
       enddo
+!hj    if (mpp_pe() == mpp_root_pe()) write(6,nml=atmos_model_nml)
  10     call close_file (unit)
 #endif
    endif
+!hj   if (mpp_pe() == mpp_root_pe()) write(6,*) "atmos_model_init: dycore_only=",dycore_only
 
 #ifdef CCPP
 !---------- initialize atmospheric dynamics after reading the namelist -------
@@ -616,12 +625,21 @@ subroutine atmos_model_init (Atmos, Time_init, Time, Time_step)
    endif
 #endif
 
+#ifdef SW_DYNAMICS
+   if( .not. dycore_only ) then
+#endif
+
 #ifdef CCPP
    call IPD_initialize (IPD_Control, IPD_Data, IPD_Diag, IPD_Restart, &
                         IPD_Interstitial, commglobal, mpp_npes(), Init_parm)
 #else
    call IPD_initialize (IPD_Control, IPD_Data, IPD_Diag, IPD_Restart, Init_parm)
 #endif
+
+#ifdef SW_DYNAMICS
+   endif
+#endif
+
 
    if (IPD_Control%do_sppt .OR. IPD_Control%do_shum .OR. IPD_Control%do_skeb .OR. IPD_Control%do_sfcperts) then
       ! Initialize stochastic physics
@@ -666,8 +684,10 @@ subroutine atmos_model_init (Atmos, Time_init, Time, Time_step)
 
    Atm(mytile)%flagstruct%do_skeb = IPD_Control%do_skeb
 
+   if( .not. dycore_only ) then
 !  initialize the IAU module
    call iau_initialize (IPD_Control,IAU_data,Init_parm)
+   endif
 
    Init_parm%blksz           => null()
    Init_parm%ak              => null()
@@ -682,6 +702,11 @@ subroutine atmos_model_init (Atmos, Time_init, Time, Time_step)
 !rab   call atmosphere_tracer_postinit (IPD_Data, Atm_block)
 
    call atmosphere_nggps_diag (Time, init=.true.)
+
+#ifdef SW_DYNAMICS
+   if( .not. dycore_only ) then
+#endif
+
    call FV3GFS_diag_register (IPD_Diag, Time, Atm_block, IPD_Control, Atmos%lon, Atmos%lat, Atmos%axes)
    call IPD_initialize_rst (IPD_Control, IPD_Data, IPD_Diag, IPD_Restart, Init_parm)
 #ifdef CCPP
@@ -689,6 +714,11 @@ subroutine atmos_model_init (Atmos, Time_init, Time, Time_step)
 #else
    call FV3GFS_restart_read (IPD_Data, IPD_Restart, Atm_block, IPD_Control, Atmos%domain)
 #endif
+
+#ifdef SW_DYNAMICS
+   endif
+#endif
+
 
    !--- set the initial diagnostic timestamp
    diag_time = Time 
@@ -750,6 +780,9 @@ subroutine atmos_model_init (Atmos, Time_init, Time, Time_step)
    IPD_Control%first_time_step = .true.
 #endif
 !-----------------------------------------------------------------------
+
+!hj    if (mpp_pe() == mpp_root_pe() ) write(6,*) "atmos_model_init: end"
+
 end subroutine atmos_model_init
 ! </SUBROUTINE>
 
@@ -762,10 +795,12 @@ subroutine update_atmos_model_dynamics (Atmos)
 ! run the atmospheric dynamics to advect the properties
   type (atmos_data_type), intent(in) :: Atmos
 
+!hj    if (mpp_pe() == mpp_root_pe() ) write(6,*) "update_atmos_model_dynamics: enter"
     call set_atmosphere_pelist()
     call mpp_clock_begin(fv3Clock)
     call atmosphere_dynamics (Atmos%Time)
     call mpp_clock_end(fv3Clock)
+    if (mpp_pe() == mpp_root_pe() ) write(6,*) "update_atmos_model_dynamics: end"
 
 end subroutine update_atmos_model_dynamics
 ! </SUBROUTINE>
@@ -793,6 +828,7 @@ subroutine atmos_model_exchange_phase_1 (Atmos, rc)
 !--- local variables
   integer :: localrc
 
+!hj    if (mpp_pe() == mpp_root_pe() ) write(6,*) "atmos_model_exchange_phase_1: enter"
     !--- begin
     if (present(rc)) rc = ESMF_SUCCESS
 
@@ -802,6 +838,7 @@ subroutine atmos_model_exchange_phase_1 (Atmos, rc)
       call update_atmos_chemistry('export', rc=localrc)
       if (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__, rcToReturn=rc)) return
     endif
+!hj    if (mpp_pe() == mpp_root_pe() ) write(6,*) "atmos_model_exchange_phase_1: end"
 
  end subroutine atmos_model_exchange_phase_1
 ! </SUBROUTINE>
@@ -829,6 +866,7 @@ subroutine atmos_model_exchange_phase_2 (Atmos, rc)
 !--- local variables
   integer :: localrc
 
+!hj    if (mpp_pe() == mpp_root_pe() ) write(6,*) "atmos_model_exchange_phase_2: enter"
     !--- begin
     if (present(rc)) rc = ESMF_SUCCESS
 
@@ -838,6 +876,7 @@ subroutine atmos_model_exchange_phase_2 (Atmos, rc)
       call update_atmos_chemistry('import', rc=localrc)
       if (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__, rcToReturn=rc)) return
     endif
+!hj    if (mpp_pe() == mpp_root_pe() ) write(6,*) "atmos_model_exchange_phase_2: end"
 
  end subroutine atmos_model_exchange_phase_2
 ! </SUBROUTINE>
@@ -855,10 +894,13 @@ subroutine update_atmos_model_state (Atmos)
   integer :: rc
   real(kind=IPD_kind_phys) :: time_int, time_intfull
 !
+!hj    if (mpp_pe() == mpp_root_pe() ) write(6,*) "update_atmos_model_state : enter"
     call set_atmosphere_pelist()
     call mpp_clock_begin(fv3Clock)
     call mpp_clock_begin(updClock)
+#ifndef SW_DYNAMICS
     call atmosphere_state_update (Atmos%Time, IPD_Data, IAU_Data, Atm_block, flip_vc)
+#endif
     call mpp_clock_end(updClock)
     call mpp_clock_end(fv3Clock)
 
@@ -894,6 +936,7 @@ subroutine update_atmos_model_state (Atmos)
       endif
       if (mpp_pe() == mpp_root_pe()) write(6,*) ' gfs diags time since last bucket empty: ',time_int/3600.,'hrs'
       call atmosphere_nggps_diag(Atmos%Time)
+#ifndef SW_DYNAMICS
       call FV3GFS_diag_output(Atmos%Time, IPD_DIag, Atm_block, IPD_Control%nx, IPD_Control%ny, &
                             IPD_Control%levs, 1, 1, 1.d0, time_int, time_intfull,              &
                             IPD_Control%fhswr, IPD_Control%fhlwr)
@@ -903,6 +946,7 @@ subroutine update_atmos_model_state (Atmos)
         if (mod(isec,nint(3600*IPD_Control%fhzero)) == 0) diag_time = Atmos%Time
       endif
       call diag_send_complete_instant (Atmos%Time)
+#endif
     endif
 
     !--- this may not be necessary once write_component is fully implemented
@@ -918,6 +962,7 @@ subroutine update_atmos_model_state (Atmos)
       call setup_exportdata(rc)
     endif
 
+!hj    if (mpp_pe() == mpp_root_pe() ) write(6,*) "update_atmos_model_state : end"
  end subroutine update_atmos_model_state
 ! </SUBROUTINE>
 
@@ -953,13 +998,16 @@ subroutine atmos_model_end (Atmos)
 #endif
 
 !-----------------------------------------------------------------------
+!hj    if (mpp_pe() == mpp_root_pe() ) write(6,*) "atmos_model_end: enter"
 !---- termination routine for atmospheric model ----
                                               
     call atmosphere_end (Atmos % Time, Atmos%grid, restart_endfcst)
+#ifndef SW_DYNAMICS
     if(restart_endfcst) then
       call FV3GFS_restart_write (IPD_Data, IPD_Restart, Atm_block, &
                                  IPD_Control, Atmos%domain)
     endif
+#endif
 
 #ifdef CCPP
 !   Fast physics (from dynamics) are finalized in atmosphere_end above;
@@ -969,6 +1017,7 @@ subroutine atmos_model_end (Atmos)
     if (ierr/=0)  call mpp_error(FATAL, 'Call to CCPP finalize step failed')
 #endif
 
+!hj    if (mpp_pe() == mpp_root_pe() ) write(6,*) "atmos_model_end: end"
 end subroutine atmos_model_end
 
 ! </SUBROUTINE>
@@ -981,10 +1030,12 @@ subroutine atmos_model_restart(Atmos, timestamp)
   type (atmos_data_type),   intent(inout) :: Atmos
   character(len=*),  intent(in)           :: timestamp
 
+!hj    if (mpp_pe() == mpp_root_pe() ) write(6,*) "atmos_model_restart: enter"
     call atmosphere_restart(timestamp)
     call FV3GFS_restart_write (IPD_Data, IPD_Restart, Atm_block, &
                                IPD_Control, Atmos%domain, timestamp)
 
+!hj    if (mpp_pe() == mpp_root_pe() ) write(6,*) "atmos_model_restart: end"
 end subroutine atmos_model_restart
 ! </SUBROUTINE>
 
@@ -1003,6 +1054,7 @@ subroutine get_atmos_model_ungridded_dim(nlev, nsoillev, ntracers,     &
     num_diag_sfc_emis_flux, num_diag_down_flux, num_diag_type_down_flux, &
     num_diag_burn_emis_flux, num_diag_cmass
 
+!hj    if (mpp_pe() == mpp_root_pe() ) write(6,*) "get_atmos_model_ungridded_dim: enter"
   !--- number of atmospheric vertical levels
   if (present(nlev)) nlev = Atm_block%npz
 
@@ -1059,6 +1111,7 @@ subroutine get_atmos_model_ungridded_dim(nlev, nsoillev, ntracers,     &
     if (associated(IPD_Data(1)%IntDiag%aecm)) &
       num_diag_cmass = size(IPD_Data(1)%IntDiag%aecm, dim=2)
   end if
+!hj    if (mpp_pe() == mpp_root_pe() ) write(6,*) "get_atmos_model_ungridded_dim: end"
 
 end subroutine get_atmos_model_ungridded_dim
 ! </SUBROUTINE>
@@ -1107,6 +1160,7 @@ subroutine update_atmos_chemistry(state, rc)
 
 ! logical, parameter :: diag = .true.
 
+!hj    if (mpp_pe() == mpp_root_pe() ) write(6,*) "update_atmos_chemistry: enter"
   ! -- begin
   if (present(rc)) rc = ESMF_SUCCESS
 
@@ -1512,6 +1566,7 @@ subroutine update_atmos_chemistry(state, rc)
     case default
       ! -- do nothing
   end select
+!hj    if (mpp_pe() == mpp_root_pe() ) write(6,*) "update_atmos_chemistry: end"
 
 end subroutine update_atmos_chemistry
 ! </SUBROUTINE>
@@ -1549,6 +1604,7 @@ type(atmos_data_type), intent(in) :: atm
     integer         ,  intent(in) :: timestep
     integer :: n, outunit
 
+!hj    if (mpp_pe() == mpp_root_pe() ) write(6,*) "atmos_data_type_chksum: enter"
 100 format("CHECKSUM::",A32," = ",Z20)
 101 format("CHECKSUM::",A16,a,'%',a," = ",Z20)
 
@@ -1558,6 +1614,7 @@ type(atmos_data_type), intent(in) :: atm
   write(outunit,100) ' atm%lat_bnd                ', mpp_chksum(atm%lat_bnd)
   write(outunit,100) ' atm%lon                    ', mpp_chksum(atm%lon)
   write(outunit,100) ' atm%lat                    ', mpp_chksum(atm%lat)
+!hj    if (mpp_pe() == mpp_root_pe() ) write(6,*) "atmos_data_type_chksum: end"
 
 end subroutine atmos_data_type_chksum
 
@@ -1601,6 +1658,7 @@ end subroutine atmos_data_type_chksum
     logical found, isFieldCreated, lcpl_fice
 !
 !------------------------------------------------------------------------------
+!hj    if (mpp_pe() == mpp_root_pe() ) write(6,*) "assign_importdata: enter"
 !
 ! set up local dimension
     rc  = -999
@@ -1972,6 +2030,7 @@ end subroutine atmos_data_type_chksum
     rc=0
 !
     if (mpp_pe() == mpp_root_pe()) print *,'end of assign_importdata'
+!hj    if (mpp_pe() == mpp_root_pe() ) write(6,*) "assign_importdata: end"
   end subroutine assign_importdata
 
 !
@@ -1991,7 +2050,7 @@ end subroutine atmos_data_type_chksum
     integer                :: j, i, ix, nb, isc, iec, jsc, jec, idx
     real(IPD_kind_phys)    :: rtime, rtimek
 !
-!   if (mpp_pe() == mpp_root_pe()) print *,'enter setup_exportdata'
+!hj    if (mpp_pe() == mpp_root_pe()) print *,'enter setup_exportdata'
 
     isc = IPD_control%isc
     iec = IPD_control%isc+IPD_control%nx-1
@@ -2703,9 +2762,9 @@ end subroutine atmos_data_type_chksum
           IPD_Data(nb)%coupling%snow_cpl(ix)   = zero
         enddo
       enddo
-      if (mpp_pe() == mpp_root_pe()) print *,'zeroing coupling fields at kdt= ',IPD_Control%kdt
+!hj      if (mpp_pe() == mpp_root_pe()) print *,'zeroing coupling fields at kdt= ',IPD_Control%kdt
     endif !cplflx
-!   if (mpp_pe() == mpp_root_pe()) print *,'end of setup_exportdata'
+    if (mpp_pe() == mpp_root_pe()) print *,'end of setup_exportdata'
 
   end subroutine setup_exportdata
 
@@ -2725,6 +2784,7 @@ end subroutine atmos_data_type_chksum
     integer, allocatable  :: lsmask(:,:)
     integer(kind=ESMF_KIND_I4), pointer  :: maskPtr(:,:)
 !
+!hj    if (mpp_pe() == mpp_root_pe()) write(6,*) "addLsmask2grid: enter "
     isc = IPD_control%isc
     iec = IPD_control%isc+IPD_control%nx-1
     jsc = IPD_control%jsc
@@ -2770,6 +2830,7 @@ end subroutine atmos_data_type_chksum
 !      print *,'in set set lsmask, maskPtr=', maxval(maskPtr), minval(maskPtr)
 !
     deallocate(lsmask)  
+!hj    if (mpp_pe() == mpp_root_pe()) write(6,*) "addLsmask2grid: end "
 
   end subroutine addLsmask2grid
 !------------------------------------------------------------------------------
