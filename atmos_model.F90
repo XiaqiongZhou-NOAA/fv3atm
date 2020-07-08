@@ -326,6 +326,7 @@ subroutine update_atmos_radiation_physics (Atmos)
             IPD_Control%nca_g,IPD_Control%ncells_g,IPD_Control%nlives_g,IPD_Control%nfracseed,&
             IPD_Control%nseed_g,IPD_Control%nthresh,IPD_Control%ca_global,IPD_Control%ca_sgs,IPD_Control%iseed_ca,&
             IPD_Control%ca_smooth,IPD_Control%nspinup,Atm_block%blksz(1),IPD_Control%nsmooth,IPD_Control%ca_amplitude)
+       endif
       endif
 
 !--- if coupled, assign coupled fields
