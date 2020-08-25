@@ -415,7 +415,7 @@ module GFS_driver
       call  wsm6init()
 #endif
 !
-    else if(Model%imp_physics == Model%imp_physics_gfdl) then      !--- initialize GFDL Cloud microphysics
+    else if(Model%imp_physics == Model%imp_physics_gfdl .and. .not. Model%do_inline_mp ) then      !--- initialize GFDL Cloud microphysics
 !## CCPP ##* gfdl_cloud_microphys.F90/gfdl_cloud_microphys_init; Note: This is automatically called during the 
 ! CCPP physics initialization stage. The check for SHOC is included in the GFDL microphysics initialization routine.
 #ifndef CCPP

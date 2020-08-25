@@ -178,6 +178,13 @@ module GFS_typedefs
     real (kind=kind_phys), pointer :: vvl  (:,:)   => null()  !< layer mean vertical velocity in pa/sec
     real (kind=kind_phys), pointer :: tgrs (:,:)   => null()  !< model layer mean temperature in k
     real (kind=kind_phys), pointer :: qgrs (:,:,:) => null()  !< layer mean tracer concentration
+
+!--- precipitation
+    real (kind=kind_phys), pointer :: prer (:)     => null()  !< rain
+    real (kind=kind_phys), pointer :: prei (:)     => null()  !< ice
+    real (kind=kind_phys), pointer :: pres (:)     => null()  !< snow
+    real (kind=kind_phys), pointer :: preg (:)     => null()  !< graupel
+
 ! dissipation estimate
     real (kind=kind_phys), pointer :: diss_est(:,:)   => null()  !< model layer mean temperature in k
     ! soil state variables - for soil SPPT - sfc-perts, mgehne
@@ -651,6 +658,10 @@ module GFS_typedefs
 
 !--- microphysical switch
     integer              :: ncld            !< choice of cloud scheme
+
+    !--- GFDL microphysical parameters
+    logical              :: do_inline_mp    !< flag for GFDL cloud microphysics
+
     !--- new microphysical switch
     integer              :: imp_physics                    !< choice of microphysics scheme
     integer              :: imp_physics_gfdl = 11          !< choice of GFDL     microphysics scheme
@@ -2009,6 +2020,16 @@ module GFS_typedefs
     Statein%ugrs   = clear_val
     Statein%vgrs   = clear_val
 
+    allocate (Statein%prer(IM))
+    allocate (Statein%prei(IM))
+    allocate (Statein%pres(IM))
+    allocate (Statein%preg(IM))
+
+    Statein%prer = clear_val
+    Statein%prei = clear_val
+    Statein%pres = clear_val
+    Statein%preg = clear_val
+
     !--- soil state variables - for soil SPPT - sfc-perts, mgehne
     allocate (Statein%smc  (IM,Model%lsoil))
     allocate (Statein%stc  (IM,Model%lsoil))
@@ -2771,6 +2792,9 @@ module GFS_typedefs
     logical              :: lwhtr             = .true.       !< flag to output lw heating rate (Radtend%lwhc)
     logical              :: swhtr             = .true.       !< flag to output sw heating rate (Radtend%swhc)
 
+    !--- GFDL microphysical parameters
+    logical              :: do_inline_mp = .false.           !< flag for GFDL cloud microphysics
+
 !--- Z-C microphysical parameters
     integer              :: ncld              =  1                 !< choice of cloud scheme
     integer              :: imp_physics       =  99                !< choice of cloud scheme
@@ -3110,7 +3134,7 @@ module GFS_typedefs
                           ! IN CCN forcing
                                iccn,                                                        &
                           !--- microphysical parameterizations
-                               ncld, imp_physics, psautco, prautco, evpco, wminco,          &
+                               ncld, imp_physics,  do_inline_mp, psautco, prautco, evpco, wminco,          &
 #ifdef CCPP
                                fprcp, pdfflag, mg_dcs, mg_qcvar, mg_ts_auto_ice, mg_rhmini, &
                                effr_in, tf, tcr,                                            &
@@ -3368,6 +3392,8 @@ module GFS_typedefs
 !--- microphysical switch
     Model%ncld             = ncld
     Model%imp_physics      = imp_physics
+    !--- GFDL microphysical parameters
+    Model%do_inline_mp     = do_inline_mp
     ! turn off ICCN interpolation when MG2/3 are not used
     if (.not. Model%imp_physics==Model%imp_physics_mg) Model%iccn = .false.
 !--- Zhao-Carr MP parameters
@@ -4457,6 +4483,8 @@ module GFS_typedefs
       print *, 'microphysical switch'
       print *, ' ncld              : ', Model%ncld
       print *, ' imp_physics       : ', Model%imp_physics
+      print *, ' do_inline_mp      : ', Model%do_inline_mp
+
       print *, ' '
 
       if (Model%imp_physics == Model%imp_physics_zhao_carr .or. Model%imp_physics == Model%imp_physics_zhao_carr_pdf) then

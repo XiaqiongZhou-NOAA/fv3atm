@@ -5012,6 +5012,26 @@ module module_physics_driver
 
         elseif (imp_physics == Model%imp_physics_gfdl) then     ! GFDL MP
                                                                 ! -------
+            if (Model%do_inline_mp) then       ! GFDL Cloud microphysics
+
+                tem = dtp * con_p001 / con_day
+                Statein%prer(:) = Statein%prer(:) * tem
+                Statein%pres(:) = Statein%pres(:) * tem
+                Statein%prei(:) = Statein%prei(:) * tem
+                Statein%preg(:) = Statein%preg(:) * tem
+                rain1(:)   = Statein%prer(:)+Statein%pres(:)+Statein%prei(:)+Statein%preg(:)
+                Diag%ice(:)     = Statein%prei(:)
+                Diag%snow(:)    = Statein%pres(:)
+                Diag%graupel(:) = Statein%preg(:)
+                do i = 1, im
+                   if (rain1(i) .gt. 0.0) then
+                       Diag%sr(i)  = (Statein%pres(i) + Statein%prei(i) + Statein%preg(i)) &
+                         /(Statein%prer(i) + Statein%pres(i) + Statein%prei(i) + Statein%preg(i))
+                   else
+                       Diag%sr(i) = 0.0
+                   endif
+                enddo    
+        else                                                     
           do i = 1, im
 !## CCPP ##* Not necessary in the CCPP.
             land     (i,1)   = frland(i)
@@ -5121,6 +5141,7 @@ module module_physics_driver
               Stateout%gv0(i,k)         = Stateout%gv0(i,k) + vdt  (i,1,kk) * dtp
               Diag%refl_10cm(i,k)       = refl(i,1,kk)
             enddo
+          endif
 
 
             if(Model%effr_in) then
@@ -5384,16 +5405,29 @@ module module_physics_driver
 #ifdef REPRO
           ! For bit-for-bit identical results with CCPP code, snow0/ice0/graupel0/rain0
           ! were converted from mm per day to m per physics timestep previously in the code
-          total_precip = snow0(i,1)+ice0(i,1)+graupel0(i,1)+rain0(i,1)+Diag%rainc(i)
-          if (total_precip > rainmin) then
+          if (Model%do_inline_mp) then       ! GFDL Cloud microphysics
+             total_precip = Statein%pres(i)+Statein%prei(i)+Statein%preg(i)+Statein%prer(i)+Diag%rainc(i)
+             if (total_precip > rainmin) then
+                Sfcprop%srflag(i) = (Statein%pres(i)+Statein%prei(i)+Statin%preg(i)+csnow)/total_precip
+             endif
+          else
+            total_precip = snow0(i,1)+ice0(i,1)+graupel0(i,1)+rain0(i,1)+Diag%rainc(i)
+            if (total_precip > rainmin) then
             Sfcprop%srflag(i) = (snow0(i,1)+ice0(i,1)+graupel0(i,1)+csnow)/total_precip
+            endif
           endif
 #else
-          tem1 = snow0(i,1)+ice0(i,1)+graupel0(i,1)
-          total_precip = (tem1+rain0(i,1)) * tem + Diag%rainc(i)
-          if (total_precip > rainmin) then
+         if (Model%do_inline_mp) then       ! GFDL Cloud microphysics
+           tem1 = Statein%pres(i)+Statein%prei(i)+Statin%preg(i)
+           total_precip = (tem1+Statein%prer(i)) * tem + Diag%rainc(i)
+  
+         else   
+           tem1 = snow0(i,1)+ice0(i,1)+graupel0(i,1)
+           total_precip = (tem1+rain0(i,1)) * tem + Diag%rainc(i)
+         endif
+         if (total_precip > rainmin) then
             Sfcprop%srflag(i) = (tem1*tem+csnow) / total_precip
-          endif
+         endif
 #endif
         enddo
       elseif( .not. Model%cal_pre) then
