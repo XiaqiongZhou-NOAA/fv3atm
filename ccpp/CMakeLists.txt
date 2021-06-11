@@ -90,6 +90,10 @@ if(MULTI_GASES)
   add_definitions(-DMULTI_GASES)
 endif()
 
+if(IDEA_PHYS)
+  add_definitions(-DIDEA_PHYS)
+endif()
+
 #------------------------------------------------------------------------------
 # Build CCPP framework and physics
 
@@ -104,19 +108,9 @@ target_include_directories(ccppphys PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/framewor
 #------------------------------------------------------------------------------
 # Build fv3ccpp
 
-<<<<<<< HEAD
-#------------------------------------------------------------------------------
-# Set idea_phys flags for preprocessor (if defined)
-if(IDEA_PHYS)
-  message (STATUS "Enable idea-phys")
-  ADD_DEFINITIONS(-DIDEA_PHYS)
-else(IDEA_PHYS)
-  message (STATUS "Disable idea-phys")
-endif(IDEA_PHYS)
 
 #------------------------------------------------------------------------------
 # Build CCPP framework and physics
-=======
 # Can we move data/*.F90 and driver/*.F90 to this directory ???
 add_library(
     fv3ccpp
@@ -132,7 +126,6 @@ add_library(
 
     ${CMAKE_CURRENT_BINARY_DIR}/physics/ccpp_static_api.F90
 )
->>>>>>> NOAA-EMC/develop
 
 # Compile GFS_diagnostics.F90 without optimization, this leads to out of memory errors on wcoss_dell_p3
 set_property(SOURCE driver/GFS_diagnostics.F90 APPEND_STRING PROPERTY COMPILE_FLAGS "-O0")
