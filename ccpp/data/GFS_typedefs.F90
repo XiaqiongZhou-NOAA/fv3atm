@@ -3104,28 +3104,6 @@ module GFS_typedefs
     logical              :: norad_precip      = .false.      !< radiation precip flag for Ferrier/Moorthi
     logical              :: lwhtr             = .true.       !< flag to output lw heating rate (Radtend%lwhc)
     logical              :: swhtr             = .true.       !< flag to output sw heating rate (Radtend%swhc)
-<<<<<<< HEAD
-    ! RRTMGP                                                                                                                                                                                                                                                                                                                                             
-    logical              :: do_RRTMGP        = .false.       !< Use RRTMGP?
-    character(len=128)   :: active_gases    = ''             !< Character list of active gases used in RRTMGP
-    integer              :: nGases          = 0              !< Number of active gases
-    character(len=128)   :: rrtmgp_root     = ''             !< Directory of rte+rrtmgp source code
-    character(len=128)   :: lw_file_gas     = ''             !< RRTMGP K-distribution file, coefficients to compute optics for gaseous atmosphere
-    character(len=128)   :: lw_file_clouds  = ''             !< RRTMGP file containing coefficients used to compute clouds optical properties
-    integer              :: rrtmgp_nBandsLW = 16             !< Number of RRTMGP LW bands.
-    integer              :: rrtmgp_nGptsLW  = 256            !< Number of RRTMGP LW spectral points.
-    character(len=128)   :: sw_file_gas     = ''             !< RRTMGP K-distribution file, coefficients to compute optics for gaseous atmosphere
-    character(len=128)   :: sw_file_clouds  = ''             !< RRTMGP file containing coefficients used to compute clouds optical properties
-    integer              :: rrtmgp_nBandsSW = 14             !< Number of RRTMGP SW bands.
-    integer              :: rrtmgp_nGptsSW  = 224            !< Number of RRTMGP SW spectral points.
-    logical              :: doG_cldoptics       = .false.    !< Use legacy RRTMG cloud-optics?
-    logical              :: doGP_cldoptics_PADE = .false.    !< Use RRTMGP cloud-optics: PADE approximation?
-    logical              :: doGP_cldoptics_LUT  = .false.    !< Use RRTMGP cloud-optics: LUTs?
-    integer              :: rrtmgp_nrghice = 0               !< Number of ice-roughness categories
-    integer              :: rrtmgp_nGauss_ang=1              !< Number of angles used in Gaussian quadrature
-    logical              :: do_GPsw_Glw    = .false.     
-    logical              :: use_LW_jacobian = .false.        !< Use Jacobian of LW to update LW radiation tendencies. 
-=======
     ! RRTMGP
     logical              :: do_RRTMGP           = .false.    !< Use RRTMGP?
     character(len=128)   :: active_gases        = ''         !< Character list of active gases used in RRTMGP
@@ -3146,7 +3124,6 @@ module GFS_typedefs
     integer              :: rrtmgp_nGauss_ang   = 1          !< Number of angles used in Gaussian quadrature
     logical              :: do_GPsw_Glw         = .false.
     logical              :: use_LW_jacobian     = .false.    !< Use Jacobian of LW to update LW radiation tendencies.
->>>>>>> NOAA-EMC/develop
     logical              :: doGP_lwscat         = .false.    !< If true, include scattering in longwave cloud-optics, only compatible w/ GP cloud-optics
 !--- Z-C microphysical parameters
     integer              :: ncld              =  1                 !< choice of cloud scheme
