@@ -1181,7 +1181,7 @@ if (rc /= ESMF_SUCCESS) write(0,*) 'rc=',rc,__FILE__,__LINE__; if(ESMF_LogFoundE
 
       call update_atmos_model_dynamics (Atmos)
 
-      call get_time (Atmos%Time - Atmos%Time_init, seconds)
+      call get_time (Atmos%Time - Atmos%Time_init + Atmos%Time_step, seconds)
       tt = real(seconds)
       tp = real(dt_phys)
       if(mod(tt,tp)==0) call update_atmos_radiation_physics (Atmos)
