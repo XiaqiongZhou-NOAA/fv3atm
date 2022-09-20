@@ -669,7 +669,7 @@ subroutine atmos_model_init (Atmos, Time_init, Time, Time_step, dtp)
    Init_parm%logunit         =  logunit
    Init_parm%bdat(:)         =  bdat(:)
    Init_parm%cdat(:)         =  cdat(:)
-   Init_parm%dt_dycore       =  dt_phys
+   Init_parm%dt_dycore       =  dt_dyn
    Init_parm%dt_phys         =  dt_phys
    Init_parm%iau_offset      =  Atmos%iau_offset
    Init_parm%blksz           => Atm_block%blksz
