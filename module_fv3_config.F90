@@ -14,6 +14,7 @@
   implicit none
 !
   integer                  :: nfhout, nfhout_hf, nsout, dt_atmos
+  integer                  :: k_split, dt_phys
   integer                  :: first_kdt
   integer                  :: fcst_mpi_comm, fcst_ntasks
 !

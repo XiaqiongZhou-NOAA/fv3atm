@@ -65,7 +65,7 @@ if (rc /= ESMF_SUCCESS) write(0,*) 'rc=',rc,__FILE__,__LINE__; if(ESMF_LogFoundE
                                 nbdlphys, iau_offset
   use module_fv3_config,  only: dt_atmos, fcst_mpi_comm, fcst_ntasks,      &
                                 quilting, calendar, cpl_grid_id,           &
-                                cplprint_flag, restart_endfcst
+                                cplprint_flag, restart_endfcst, dt_phys
 
   use get_stochy_pattern_mod, only: write_stoch_restart_atm
   use module_cplfields,       only: nExportFields, exportFields, exportFieldsInfo, &
@@ -538,7 +538,7 @@ if (rc /= ESMF_SUCCESS) write(0,*) 'rc=',rc,__FILE__,__LINE__; if(ESMF_LogFoundE
     type(ESMF_Info)   :: info
 
     type(time_type)               :: Time_init, Time, Time_step, Time_end, &
-                                     Time_restart, Time_step_restart
+                                     Time_restart, Time_step_restart, dtp
     type(time_type)               :: iautime
     integer                       :: io_unit, calendar_type_res, date_res(6), date_init_res(6)
 
@@ -693,6 +693,7 @@ if (rc /= ESMF_SUCCESS) write(0,*) 'rc=',rc,__FILE__,__LINE__; if(ESMF_LogFoundE
     call diag_manager_set_time_end(Time_end)
 !
     Time_step = set_time (dt_atmos,0)
+    dtp = set_time (dt_phys,0)
     if (mype == 0) write(*,*)'time_init=', date_init,'time=',date,'time_end=',date_end,'dt_atmos=',dt_atmos
 
 ! set up forecast time array that controls when to write out restart files
@@ -761,7 +762,7 @@ if (rc /= ESMF_SUCCESS) write(0,*) 'rc=',rc,__FILE__,__LINE__; if(ESMF_LogFoundE
 
 !------ initialize component models ------
 
-     call  atmos_model_init (Atmos, Time_init, Time, Time_step)
+     call  atmos_model_init (Atmos, Time_init, Time, Time_step, dtp)
 !
      inquire(FILE='data_table', EXIST=fexist)
      if (fexist) then
@@ -1158,7 +1159,7 @@ if (rc /= ESMF_SUCCESS) write(0,*) 'rc=',rc,__FILE__,__LINE__; if(ESMF_LogFoundE
 !***  local variables
 !
       integer                    :: mype, seconds
-      real(kind=8)               :: mpi_wtime, tbeg1
+      real(kind=8)               :: mpi_wtime, tbeg1, tt, tp
 !
 !-----------------------------------------------------------------------
 !***********************************************************************
@@ -1180,7 +1181,10 @@ if (rc /= ESMF_SUCCESS) write(0,*) 'rc=',rc,__FILE__,__LINE__; if(ESMF_LogFoundE
 
       call update_atmos_model_dynamics (Atmos)
 
-      call update_atmos_radiation_physics (Atmos)
+      call get_time (Atmos%Time - Atmos%Time_init, seconds)
+      tt = real(seconds)
+      tp = real(dt_phys)
+      if(mod(tt,tp)==0) call update_atmos_radiation_physics (Atmos)
 
       call atmos_model_exchange_phase_1 (Atmos, rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return

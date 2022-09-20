@@ -29,7 +29,7 @@ module fv3gfs_cap_mod
 !
   use module_fv3_config,      only: quilting, output_fh,                     &
                                     nfhout, nfhout_hf, nsout, dt_atmos,      &
-                                    calendar, cpl_grid_id,                   &
+                                    dt_phys, k_split, calendar, cpl_grid_id, &
                                     cplprint_flag,output_1st_tstep_rst,      &
                                     first_kdt
 
@@ -315,6 +315,12 @@ module fv3gfs_cap_mod
     endif ! quilting
 !
     call ESMF_ConfigGetAttribute(config=CF, value=dt_atmos, label ='dt_atmos:',   rc=rc)
+    call ESMF_ConfigGetAttribute(config=CF, value=k_split, label ='k_split:',   rc=rc)
+
+    dt_phys = dt_atmos
+    dt_atmos = dt_phys/k_split
+    k_split = 1
+
     call ESMF_ConfigGetAttribute(config=CF, value=nfhmax,   label ='nhours_fcst:',rc=rc)
     if(mype == 0) print *,'af nems config,dt_atmos=',dt_atmos,'nfhmax=',nfhmax
 
