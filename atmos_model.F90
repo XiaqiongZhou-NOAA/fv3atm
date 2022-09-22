@@ -511,7 +511,7 @@ end subroutine atmos_timestep_diagnostics
 ! Routine to initialize the atmospheric model
 ! </OVERVIEW>
 
-subroutine atmos_model_init (Atmos, Time_init, Time, Time_step)
+subroutine atmos_model_init (Atmos, Time_init, Time, Time_step, dtp)
 
 #ifdef _OPENMP
   use omp_lib
@@ -519,14 +519,14 @@ subroutine atmos_model_init (Atmos, Time_init, Time, Time_step)
   use update_ca, only: read_ca_restart
 
   type (atmos_data_type), intent(inout) :: Atmos
-  type (time_type), intent(in) :: Time_init, Time, Time_step
+  type (time_type), intent(in) :: Time_init, Time, Time_step, dtp
 !--- local variables ---
   integer :: unit, i
   integer :: mlon, mlat, nlon, nlat, nlev, sec
   integer :: ierr, io, logunit
   integer :: tile_num
   integer :: isc, iec, jsc, jec
-  real(kind=GFS_kind_phys) :: dt_phys
+  real(kind=GFS_kind_phys) :: dt_dyn, dt_phys
   logical              :: p_hydro, hydro
   logical, save        :: block_message = .true.
   type(GFS_init_type)  :: Init_parm
@@ -544,6 +544,8 @@ subroutine atmos_model_init (Atmos, Time_init, Time, Time_step)
    Atmos % Time      = Time
    Atmos % Time_step = Time_step
    call get_time (Atmos % Time_step, sec)
+   dt_dyn = real(sec)
+   call get_time(dtp,sec)
    dt_phys = real(sec)      ! integer seconds
 
    logunit = stdlog()
@@ -551,7 +553,7 @@ subroutine atmos_model_init (Atmos, Time_init, Time, Time_step)
 !---------- initialize atmospheric dynamics after reading the namelist -------
 !---------- (need name of CCPP suite definition file from input.nml) ---------
    call atmosphere_init (Atmos%Time_init, Atmos%Time, Atmos%Time_step,&
-                         Atmos%grid, Atmos%area)
+                         dtp, Atmos%grid, Atmos%area)
 
 !-----------------------------------------------------------------------
    call atmosphere_resolution (nlon, nlat, global=.false.)
@@ -667,7 +669,7 @@ subroutine atmos_model_init (Atmos, Time_init, Time, Time_step)
    Init_parm%logunit         =  logunit
    Init_parm%bdat(:)         =  bdat(:)
    Init_parm%cdat(:)         =  cdat(:)
-   Init_parm%dt_dycore       =  dt_phys
+   Init_parm%dt_dycore       =  dt_dyn
    Init_parm%dt_phys         =  dt_phys
    Init_parm%iau_offset      =  Atmos%iau_offset
    Init_parm%blksz           => Atm_block%blksz
