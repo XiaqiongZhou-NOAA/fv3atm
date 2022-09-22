@@ -11,5 +11,6 @@
   url = https://github.com/NOAA-EMC/UPP
   branch = develop
 [submodule "atmos_cubed_sphere"]
-	path = atmos_cubed_sphere
-	url = https://github.com/JiliDong-NOAA/GFDL_atmos_cubed_sphere.git
+  path = atmos_cubed_sphere
+  url = https://github.com/XiaqiongZhou-NOAA/GFDL_atmos_cubed_sphere.git
+  branch = rrfs_ideal_pdc
