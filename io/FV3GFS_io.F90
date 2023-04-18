@@ -947,7 +947,7 @@ module FV3GFS_io_mod
     !--- open file
     infile=trim(indir)//'/'//trim(fn_oro)
     amiopen=open_file(Oro_restart, trim(infile), 'read', domain=fv_domain, is_restart=.true., dont_add_res_to_filename=.true.)
-    if (.not.amiopen) call mpp_error( FATAL, 'Error with opening file '//trim(infile) )
+    if (amiopen) then
 
     if (.not. allocated(oro_name2)) then
     !--- allocate the various containers needed for orography data
@@ -1061,6 +1061,26 @@ module FV3GFS_io_mod
       enddo
     enddo
 
+    deallocate(oro_name2, oro_var2)
+  else
+    call mpp_error( NOTE, 'Error with opening file '//trim(infile) )
+      do nb = 1, Atm_block%nblks
+          !--- 2D variables
+          do ix = 1, Atm_block%blksz(nb)
+             i = Atm_block%index(nb)%ii(ix) - isc + 1
+             j = Atm_block%index(nb)%jj(ix) - jsc + 1
+             !--- stddev
+             !--- hprime(1:14)
+             Sfcprop(nb)%hprime(ix,1:14)  = 0.0
+             !--- oro
+             Sfcprop(nb)%oro(ix)        = 0.0
+             !--- oro_uf
+             Sfcprop(nb)%oro_uf(ix)     = 0.0
+          enddo
+       enddo
+
+    endif
+
     nvar_s2m = 48
     if (Model%use_cice_alb .or. Model%lsm == Model%lsm_ruc) then
       nvar_s2m = nvar_s2m + 4
@@ -1071,7 +1091,6 @@ module FV3GFS_io_mod
     endif
 
     !--- deallocate containers and free restart container
-    deallocate(oro_name2, oro_var2)
     deallocate(oro_var3v)
     deallocate(oro_var3s)
 
@@ -1233,12 +1252,12 @@ module FV3GFS_io_mod
       !--- open restart file
       infile=trim(indir)//'/'//trim(fn_oro_ls)
       amiopen=open_file(Oro_ls_restart, trim(infile), 'read', domain=fv_domain, is_restart=.true., dont_add_res_to_filename=.true.)
-      if( .not.amiopen ) call mpp_error( FATAL, 'Error with opening file '//trim(infile) )
+      if( .not.amiopen ) call mpp_error( NOTE, 'Error with opening file '//trim(infile) )
 
       !--- open restart file
       infile=trim(indir)//'/'//trim(fn_oro_ss)
       amiopen=open_file(Oro_ss_restart, trim(infile), 'read', domain=fv_domain, is_restart=.true., dont_add_res_to_filename=.true.)
-      if( .not.amiopen ) call mpp_error( FATAL, 'Error with opening file '//trim(infile) )
+      if( .not.amiopen ) call mpp_error( NOTE, 'Error with opening file '//trim(infile) )
 
       if (.not. allocated(oro_ls_ss_name)) then
       !--- allocate the various containers needed for orography data
@@ -1328,8 +1347,198 @@ module FV3GFS_io_mod
    !--- open file
    infile=trim(indir)//'/'//trim(fn_srf)
    amiopen=open_file(Sfc_restart, trim(infile), "read", domain=fv_domain, is_restart=.true., dont_add_res_to_filename=.true.)
-   if( .not.amiopen ) call mpp_error(FATAL, 'Error opening file'//trim(infile))
 
+   if( .not.amiopen ) then
+     call mpp_error(NOTE, 'Error opening file'//trim(infile))
+      !Need a namelist for options:
+      ! 1. choice of sst (uniform, profiles) --- ML0 should relax to this
+      ! 2. Choice of veg, soil type with certain soil T,q,ql
+      ! How to fix day of year (for astronomy)?
+      !--- place the data into the block GFS containers
+! jdong set all land
+     if (Model%lidealland) then
+      do nb = 1, Atm_block%nblks
+          do ix = 1, Atm_block%blksz(nb)
+             i = Atm_block%index(nb)%ii(ix) - isc + 1
+             j = Atm_block%index(nb)%jj(ix) - jsc + 1
+             !--- 2D variables
+             !--- slmsk
+             Sfcprop(nb)%slmsk(ix)  = 1.  !--- tsfc (tsea in sfc file)
+             Sfcprop(nb)%tsfc(ix)   = 300. ! should specify some latitudinal profile !--- weasd (sheleg in sfc file) 
+             Sfcprop(nb)%tsfcl(ix)  = 300. ! should specify some latitudinal
+             Sfcprop(nb)%weasd(ix)  = 0.0 !--- tg3
+             Sfcprop(nb)%tg3(ix)    = 290. ! or 289 !generic value, probably not goodi; real value latitude-dependent
+             !--- zorl
+             Sfcprop(nb)%zorl(ix)   = 13 ! changed typical ocean value; different values for different land surfaces (use a lookup table?) 
+             !--- zorll
+             Sfcprop(nb)%zorll(ix)   = 13 ! changed typical ocean value;                                                                  
+             !--- alvsf
+             Sfcprop(nb)%alvsf(ix)  = 0.06
+             !--- alvwf
+             Sfcprop(nb)%alvwf(ix)  = 0.06
+             !--- alnsf
+             Sfcprop(nb)%alnsf(ix)  = 0.3 ! changed
+             !--- alnwf
+             Sfcprop(nb)%alnwf(ix)  = 0.3 ! changed
+             !--- facsf
+             Sfcprop(nb)%facsf(ix)  = 1.0 ! changed
+             !--- facwf
+             Sfcprop(nb)%facwf(ix)  = 6.0 ! changed
+             !--- vfrac
+             Sfcprop(nb)%vfrac(ix)  = 0.6 ! changed
+             !--- canopy
+             Sfcprop(nb)%canopy(ix) = 0.5 ! changed
+             !--- f10m
+             Sfcprop(nb)%f10m(ix)   = 0.9
+             !--- t2m
+             Sfcprop(nb)%t2m(ix)    = Sfcprop(nb)%tsfc(ix)
+             !--- q2m
+             Sfcprop(nb)%q2m(ix)    = 0.01 ! changed initially dry atmosphere?
+             !--- vtype
+             Sfcprop(nb)%vtype(ix)  = 12.0 ! changed
+             !--- stype
+             Sfcprop(nb)%stype(ix)  = 4.0  ! changed
+             !--- uustar
+             Sfcprop(nb)%uustar(ix) = 0.25 ! changed
+             !--- ffmm
+             Sfcprop(nb)%ffmm(ix)   = 6.   ! changed
+             !--- ffhh
+             Sfcprop(nb)%ffhh(ix)   = 0.   ! changed
+             !--- hice
+             Sfcprop(nb)%hice(ix)   = 0.0
+             !--- fice
+             Sfcprop(nb)%fice(ix)   = 0.0
+             !--- tisfc
+             Sfcprop(nb)%tisfc(ix)  = Sfcprop(nb)%tsfc(ix)
+             !--- tprcp
+             Sfcprop(nb)%tprcp(ix)  = 0.0
+             !--- srflag
+             Sfcprop(nb)%srflag(ix) = 0.0
+             !--- snowd (snwdph in the file)
+             Sfcprop(nb)%snowd(ix)  = 0.0
+             !--- shdmin
+             Sfcprop(nb)%shdmin(ix) = 0.2 ! changed this and the next depend on the surface type 
+             !--- shdmax
+             Sfcprop(nb)%shdmax(ix) = 0.6 ! changed
+             !--- slope
+             Sfcprop(nb)%slope(ix)  = 1.0 ! changed also land-surface dependent
+             !--- snoalb
+             Sfcprop(nb)%snoalb(ix) = 0.6 ! changed
+             !--- sncovr
+             Sfcprop(nb)%sncovr(ix) = 0.0
+             !
+          if ((Model%nstf_name(1) > 0) .and. (Model%nstf_name(2) == 1)) then
+               !--- nsstm tref
+                Sfcprop(nb)%tref(ix)    = Sfcprop(nb)%tsfc(ix)
+                Sfcprop(nb)%xz(ix)      = 30.0d0
+             endif
+             if ((Model%nstf_name(1) > 0) .and. (Model%nstf_name(2) == 0)) then
+                !return an error
+                call mpp_error(FATAL, 'cold-starting does not support NSST.')
+             endif
+
+             !--- 3D variables
+             ! these are all set to ocean values.
+                !--- stc
+                Sfcprop(nb)%stc(ix,:) = Sfcprop(nb)%tsfc(ix)
+                !--- smc
+                Sfcprop(nb)%smc(ix,:) = 0.25   ! changed
+                !--- slc
+                Sfcprop(nb)%slc(ix,:) = 0.25   ! changed  
+          enddo
+       enddo
+      else
+      do nb = 1, Atm_block%nblks
+          do ix = 1, Atm_block%blksz(nb)
+             i = Atm_block%index(nb)%ii(ix) - isc + 1
+             j = Atm_block%index(nb)%jj(ix) - jsc + 1
+             !--- 2D variables
+             !--- slmsk
+             Sfcprop(nb)%slmsk(ix)  = 0.  !--- tsfc (tsea in sfc file)
+             Sfcprop(nb)%tsfc(ix)   = 300. ! should specify some latitudinal
+             Sfcprop(nb)%tsfco(ix)   = 300. ! should specify some latitudinal
+             Sfcprop(nb)%weasd(ix)  = 0.0 !--- tg3
+             Sfcprop(nb)%tg3(ix)    = 290. !generic value, probably not goodi;
+             !--- zorl
+             Sfcprop(nb)%zorl(ix)   = 0.1 ! typical ocean value; different
+             !--- alvsf
+             Sfcprop(nb)%alvsf(ix)  = 0.06
+             !--- alvwf
+             Sfcprop(nb)%alvwf(ix)  = 0.06
+             !--- alnsf
+             Sfcprop(nb)%alnsf(ix)  = 0.06
+             !--- alnwf
+             Sfcprop(nb)%alnwf(ix)  = 0.06
+             !--- facsf
+             Sfcprop(nb)%facsf(ix)  = 0.0
+             !--- facwf
+             Sfcprop(nb)%facwf(ix)  = 0.0
+             !--- vfrac
+             Sfcprop(nb)%vfrac(ix)  = 0.0
+             !--- canopy
+             Sfcprop(nb)%canopy(ix) = 0.0
+             !--- f10m
+             Sfcprop(nb)%f10m(ix)   = 0.9
+             !--- t2m
+             Sfcprop(nb)%t2m(ix)    = Sfcprop(nb)%tsfc(ix)
+             !--- q2m
+             Sfcprop(nb)%q2m(ix)    = 0.0 ! initially dry atmosphere?
+             !--- vtype
+             Sfcprop(nb)%vtype(ix)  = 0.0
+             !--- stype
+             Sfcprop(nb)%stype(ix)  = 0.0
+             !--- uustar
+             Sfcprop(nb)%uustar(ix) = 0.5
+             !--- ffmm
+             Sfcprop(nb)%ffmm(ix)   = 10.
+             !--- ffhh
+             Sfcprop(nb)%ffhh(ix)   = 10.
+             !--- hice
+             Sfcprop(nb)%hice(ix)   = 0.0
+             !--- fice
+             Sfcprop(nb)%fice(ix)   = 0.0
+             !--- tisfc
+             Sfcprop(nb)%tisfc(ix)  = Sfcprop(nb)%tsfc(ix)
+             !--- tprcp
+             Sfcprop(nb)%tprcp(ix)  = 0.0
+             !--- srflag
+             Sfcprop(nb)%srflag(ix) = 0.0
+             !--- snowd (snwdph in the file)
+             Sfcprop(nb)%snowd(ix)  = 0.0
+             !--- shdmin
+             Sfcprop(nb)%shdmin(ix) = 0.0 !this and the next depend on the
+             !--- shdmax
+             Sfcprop(nb)%shdmax(ix) = 0.0
+             !--- slope
+             Sfcprop(nb)%slope(ix)  = 0.0 ! also land-surface dependent
+             !--- snoalb
+             Sfcprop(nb)%snoalb(ix) = 0.0
+             !--- sncovr
+             Sfcprop(nb)%sncovr(ix) = 0.0
+             !
+          if ((Model%nstf_name(1) > 0) .and. (Model%nstf_name(2) == 1)) then
+               !--- nsstm tref
+                Sfcprop(nb)%tref(ix)    = Sfcprop(nb)%tsfc(ix)
+                Sfcprop(nb)%xz(ix)      = 30.0d0
+             endif
+             if ((Model%nstf_name(1) > 0) .and. (Model%nstf_name(2) == 0)) then
+                !return an error
+                call mpp_error(FATAL, 'cold-starting does not support NSST.')
+             endif
+
+             !--- 3D variables
+             ! these are all set to ocean values.
+                !--- stc
+                Sfcprop(nb)%stc(ix,:) = Sfcprop(nb)%tsfc(ix)
+                !--- smc
+                Sfcprop(nb)%smc(ix,:) = 1.0
+                !--- slc
+                Sfcprop(nb)%slc(ix,:) = 1.0
+          enddo
+       enddo
+      end if ! lidealland
+
+   else
     if (.not. allocated(sfc_name2)) then
       !--- allocate the various containers needed for restarts
       allocate(sfc_name2(nvar_s2m+nvar_s2o+nvar_s2mp+nvar_s2r))
@@ -2113,6 +2322,7 @@ module FV3GFS_io_mod
         enddo
       enddo
     endif
+  endif
 
     ! A standard-compliant Fortran 2003 compiler will call rrfs_sd_final here
 

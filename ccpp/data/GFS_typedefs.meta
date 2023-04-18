@@ -4752,6 +4752,12 @@
   units = flag
   dimensions = ()
   type = logical
+[lidealland]
+  standard_name = flag_for_ideal_land
+  long_name = flag for setip land for ideal cases
+  units = flag
+  dimensions = ()
+  type = logical
 [random_clds]
   standard_name = flag_for_random_clouds_for_RAS
   long_name = flag for using random clouds with the RAS scheme
