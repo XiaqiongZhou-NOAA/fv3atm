@@ -1106,6 +1106,9 @@ module FV3GFS_io_mod
     enddo
 
     deallocate(oro_name2, oro_var2)
+    !--- deallocate containers and free restart container
+    deallocate(oro_var3v)
+    deallocate(oro_var3s)
   else
     call mpp_error( NOTE, 'Error with opening file '//trim(infile) )
       do nb = 1, Atm_block%nblks
@@ -1142,9 +1145,6 @@ module FV3GFS_io_mod
 
     nvar_before_lake=nvar_s2m+nvar_s2o+nvar_s2r+nvar_s2mp
 
-    !--- deallocate containers and free restart container
-    deallocate(oro_var3v)
-    deallocate(oro_var3s)
 
     if_smoke: if(Model%rrfs_sd) then  ! for RRFS-SD
 
