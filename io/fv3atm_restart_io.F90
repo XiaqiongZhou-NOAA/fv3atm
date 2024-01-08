@@ -535,8 +535,8 @@ contains
     !--- open file
     infile=trim(indir)//'/'//trim(fn_oro)
     amiopen=open_file(Oro_restart, trim(infile), 'read', domain=fv_domain, is_restart=.true., dont_add_res_to_filename=.true.)
-    if (.not.amiopen) call mpp_error( FATAL, 'Error with opening file '//trim(infile) )
 
+    if (amiopen) then
     call oro%register(Model,Oro_restart,Atm_block)
 
     !--- read the orography restart/data
@@ -546,7 +546,10 @@ contains
 
     !--- copy data into GFS containers
     call oro%copy(Model, Sfcprop, Atm_block)
-
+    else
+    call mpp_error( NOTE, 'Error with opening file '//trim(infile) )
+    call oro_ideal (Atm_block, Sfcprop)
+    endif
     if_smoke: if(Model%rrfs_sd) then  ! for RRFS-SD
 
       !--- Dust input FILE
@@ -615,7 +618,7 @@ contains
         !--- open restart file
         infile=trim(indir)//'/'//trim(fn_oro_ls)
         amiopen=open_file(Oro_ls_restart, trim(infile), 'read', domain=fv_domain, is_restart=.true., dont_add_res_to_filename=.true.)
-        if( .not.amiopen ) call mpp_error( FATAL, 'Error with opening file '//trim(infile) )
+      if (amiopen) then
         call oro_ls%register(Model,Oro_ls_restart,Atm_block)
         !--- read new GSL created orography restart/data
         call mpp_error(NOTE,'reading topographic/orographic information from &
@@ -623,18 +626,26 @@ contains
         call read_restart(Oro_ls_restart, ignore_checksum=ignore_rst_cksum)
         call close_file(Oro_ls_restart)
         call oro_ls%copy(Sfcprop,Atm_block,1)
+       else 
+        call mpp_error( NOTE, 'Error with opening file '//trim(infile) )
+        call oro_ls_ideal(Atm_block,Sfcprop)
+       endif
       endif
 
       !--- open restart file
       infile=trim(indir)//'/'//trim(fn_oro_ss)
       amiopen=open_file(Oro_ss_restart, trim(infile), 'read', domain=fv_domain, is_restart=.true., dont_add_res_to_filename=.true.)
-      if( .not.amiopen ) call mpp_error( FATAL, 'Error with opening file '//trim(infile) )
+      if (amiopen) then
       call oro_ss%register(Model,Oro_ss_restart,Atm_block)
       call mpp_error(NOTE,'reading topographic/orographic information from &
            &INPUT/oro_data_ss.tile*.nc')
       call read_restart(Oro_ss_restart, ignore_checksum=ignore_rst_cksum)
       call close_file(Oro_ss_restart)
       call oro_ss%copy(Sfcprop,Atm_block,15)
+      else
+      call  mpp_error( NOTE, 'Error with opening file '//trim(infile) )
+      call oro_ss_ideal(Atm_block,Sfcprop)
+      endif
     end if
 
     !--- SURFACE FILE
@@ -642,7 +653,7 @@ contains
     !--- open file
     infile=trim(indir)//'/'//trim(fn_srf)
     amiopen=open_file(Sfc_restart, trim(infile), "read", domain=fv_domain, is_restart=.true., dont_add_res_to_filename=.true.)
-    if( .not.amiopen ) call mpp_error(FATAL, 'Error opening file'//trim(infile))
+    if (amiopen) then
 
     if(sfc%allocate_arrays(Model, Atm_block, .true., warm_start)) then
       call sfc%fill_2d_names(Model, warm_start)
@@ -697,6 +708,10 @@ contains
     call mpp_error(NOTE, 'gfs_driver:: - after put to container ')
 
     call sfc%apply_safeguards(Model, Atm_block, Sfcprop)
+    else
+    call mpp_error(NOTE, 'Error opening file'//trim(infile))
+    call sfc_ideal(Atm_block,Sfcprop,Model)
+    endif
 
     ! A standard-compliant Fortran 2003 compiler will call clm_lake_final and rrfs_sd_final here.
 
@@ -1264,6 +1279,246 @@ contains
     endif
 
   end subroutine phy_data_transfer_data
+  subroutine oro_ideal(Atm_block, Sfcprop)
+    type(GFS_sfcprop_type),    intent(inout) :: Sfcprop(:)
+    type (block_control_type), intent(in)    :: Atm_block
+    integer:: i, j, ix, nb
+!$omp parallel do default(shared) private(i, j, nb, ix)
+
+          do nb = 1, Atm_block%nblks
+          !--- 2D variables
+          do ix = 1, Atm_block%blksz(nb)
+             i = Atm_block%index(nb)%ii(ix) - Atm_block%isc + 1
+             j = Atm_block%index(nb)%jj(ix) - Atm_block%jsc + 1
+             !--- stddev
+             !--- hprime(1:14)
+             Sfcprop(nb)%hprime(ix,1:14)  = 0.0
+             !--- oro
+             Sfcprop(nb)%oro(ix)        = 0.0
+             !--- oro_uf
+             Sfcprop(nb)%oro_uf(ix)     = 0.0
+          enddo
+       enddo
+ end
+  subroutine oro_ls_ideal(Atm_block, Sfcprop)
+    type(GFS_sfcprop_type),    intent(inout) :: Sfcprop(:)
+    type (block_control_type), intent(in)    :: Atm_block
+    integer:: i, j, ix, nb
+!$omp parallel do default(shared) private(i, j, nb, ix)
+
+          do nb = 1, Atm_block%nblks
+          !--- 2D variables
+          do ix = 1, Atm_block%blksz(nb)
+             i = Atm_block%index(nb)%ii(ix) - Atm_block%isc + 1
+             j = Atm_block%index(nb)%jj(ix) - Atm_block%jsc + 1
+             Sfcprop(nb)%hprime(ix,1:10)  = 0.0
+          enddo
+       enddo
+ end
+  subroutine oro_ss_ideal(Atm_block, Sfcprop)
+    type(GFS_sfcprop_type),    intent(inout) :: Sfcprop(:)
+    type (block_control_type), intent(in)    :: Atm_block
+    integer:: i, j, ix, nb
+!$omp parallel do default(shared) private(i, j, nb, ix)
+
+          do nb = 1, Atm_block%nblks
+          !--- 2D variables
+          do ix = 1, Atm_block%blksz(nb)
+             i = Atm_block%index(nb)%ii(ix) - Atm_block%isc + 1
+             j = Atm_block%index(nb)%jj(ix) - Atm_block%jsc + 1
+             Sfcprop(nb)%hprime(ix,15:24)  = 0.0
+          enddo
+       enddo
+ end
+  subroutine sfc_ideal(Atm_block, Sfcprop, Model)
+    type(GFS_sfcprop_type),    intent(inout) :: Sfcprop(:)
+    type (block_control_type), intent(in)    :: Atm_block
+    type(GFS_control_type),   intent(in) :: Model
+    integer:: i, j, ix, nb
+     if (Model%lidealland) then
+      do nb = 1, Atm_block%nblks
+          do ix = 1, Atm_block%blksz(nb)
+             i = Atm_block%index(nb)%ii(ix) - Atm_block%isc + 1
+             j = Atm_block%index(nb)%jj(ix) - Atm_block%jsc + 1
+             !--- 2D variables
+             !--- slmsk
+             Sfcprop(nb)%slmsk(ix)  = 1.  !--- tsfc (tsea in sfc file)
+             Sfcprop(nb)%tsfc(ix)   = 300. ! should specify some latitudinal profile !--- weasd (sheleg in sfc file) 
+             Sfcprop(nb)%tsfcl(ix)  = 300. ! should specify some latitudinal
+             Sfcprop(nb)%weasd(ix)  = 0.0 !--- tg3
+             Sfcprop(nb)%tg3(ix)    = 290. ! or 289 !generic value, probably not goodi; real value latitude-dependent
+             !--- zorl
+             Sfcprop(nb)%zorl(ix)   = 13 ! changed typical ocean value; different values for different land surfaces (use a lookup table?) 
+             !--- zorll
+             Sfcprop(nb)%zorll(ix)   = 13 ! changed typical ocean value;                                                                  
+             !--- alvsf
+             Sfcprop(nb)%alvsf(ix)  = 0.06
+             !--- alvwf
+             Sfcprop(nb)%alvwf(ix)  = 0.06
+             !--- alnsf
+             Sfcprop(nb)%alnsf(ix)  = 0.3 ! changed
+             !--- alnwf
+             Sfcprop(nb)%alnwf(ix)  = 0.3 ! changed
+             !--- facsf
+             Sfcprop(nb)%facsf(ix)  = 1.0 ! changed
+             !--- facwf
+             Sfcprop(nb)%facwf(ix)  = 6.0 ! changed
+             !--- vfrac
+             Sfcprop(nb)%vfrac(ix)  = 0.6 ! changed
+             !--- canopy
+             Sfcprop(nb)%canopy(ix) = 0.5 ! changed
+             !--- f10m
+             Sfcprop(nb)%f10m(ix)   = 0.9
+             !--- t2m
+             Sfcprop(nb)%t2m(ix)    = Sfcprop(nb)%tsfc(ix)
+             !--- q2m
+             Sfcprop(nb)%q2m(ix)    = 0.01 ! changed initially dry atmosphere?
+             !--- vtype
+             Sfcprop(nb)%vtype(ix)  = 12.0 ! changed
+             !--- stype
+             Sfcprop(nb)%stype(ix)  = 4.0  ! changed
+             !--- uustar
+             Sfcprop(nb)%uustar(ix) = 0.25 ! changed
+             !--- ffmm
+             Sfcprop(nb)%ffmm(ix)   = 6.   ! changed
+             !--- ffhh
+             Sfcprop(nb)%ffhh(ix)   = 0.   ! changed
+             !--- hice
+             Sfcprop(nb)%hice(ix)   = 0.0
+             !--- fice
+             Sfcprop(nb)%fice(ix)   = 0.0
+             !--- tisfc
+             Sfcprop(nb)%tisfc(ix)  = Sfcprop(nb)%tsfc(ix)
+             !--- tprcp
+             Sfcprop(nb)%tprcp(ix)  = 0.0
+             !--- srflag
+             Sfcprop(nb)%srflag(ix) = 0.0
+             !--- snowd (snwdph in the file)
+             Sfcprop(nb)%snowd(ix)  = 0.0
+             !--- shdmin
+             Sfcprop(nb)%shdmin(ix) = 0.2 ! changed this and the next depend on the surface type 
+             !--- shdmax
+             Sfcprop(nb)%shdmax(ix) = 0.6 ! changed
+             !--- slope
+             Sfcprop(nb)%slope(ix)  = 1.0 ! changed also land-surface dependent
+             !--- snoalb
+             Sfcprop(nb)%snoalb(ix) = 0.6 ! changed
+             !--- sncovr
+             Sfcprop(nb)%sncovr(ix) = 0.0
+             !
+          if ((Model%nstf_name(1) > 0) .and. (Model%nstf_name(2) == 1)) then
+               !--- nsstm tref
+                Sfcprop(nb)%tref(ix)    = Sfcprop(nb)%tsfc(ix)
+                Sfcprop(nb)%xz(ix)      = 30.0d0
+             endif
+             if ((Model%nstf_name(1) > 0) .and. (Model%nstf_name(2) == 0)) then
+                !return an error
+                call mpp_error(FATAL, 'cold-starting does not support NSST.')
+             endif
+
+             !--- 3D variables
+             ! these are all set to ocean values.
+                !--- stc
+                Sfcprop(nb)%stc(ix,:) = Sfcprop(nb)%tsfc(ix)
+                !--- smc
+                Sfcprop(nb)%smc(ix,:) = 0.25   ! changed
+                !--- slc
+                Sfcprop(nb)%slc(ix,:) = 0.25   ! changed  
+          enddo
+       enddo
+      else
+      do nb = 1, Atm_block%nblks
+          do ix = 1, Atm_block%blksz(nb)
+             i = Atm_block%index(nb)%ii(ix) - Atm_block%isc + 1
+             j = Atm_block%index(nb)%jj(ix) - Atm_block%jsc + 1
+             !--- 2D variables
+             !--- slmsk
+             Sfcprop(nb)%slmsk(ix)  = 0.  !--- tsfc (tsea in sfc file)
+             Sfcprop(nb)%tsfc(ix)   = 300. ! should specify some latitudinal
+             Sfcprop(nb)%tsfco(ix)   = 300. ! should specify some latitudinal
+             Sfcprop(nb)%weasd(ix)  = 0.0 !--- tg3
+             Sfcprop(nb)%tg3(ix)    = 290. !generic value, probably not goodi;
+             !--- zorl
+             Sfcprop(nb)%zorl(ix)   = 0.1 ! typical ocean value; different
+             !--- alvsf
+             Sfcprop(nb)%alvsf(ix)  = 0.06
+             !--- alvwf
+             Sfcprop(nb)%alvwf(ix)  = 0.06
+             !--- alnsf
+             Sfcprop(nb)%alnsf(ix)  = 0.06
+             !--- alnwf
+             Sfcprop(nb)%alnwf(ix)  = 0.06
+             !--- facsf
+             Sfcprop(nb)%facsf(ix)  = 0.0
+             !--- facwf
+             Sfcprop(nb)%facwf(ix)  = 0.0
+             !--- vfrac
+             Sfcprop(nb)%vfrac(ix)  = 0.0
+             !--- canopy
+             Sfcprop(nb)%canopy(ix) = 0.0
+             !--- f10m
+             Sfcprop(nb)%f10m(ix)   = 0.9
+             !--- t2m
+             Sfcprop(nb)%t2m(ix)    = Sfcprop(nb)%tsfc(ix)
+             !--- q2m
+             Sfcprop(nb)%q2m(ix)    = 0.0 ! initially dry atmosphere?
+             !--- vtype
+             Sfcprop(nb)%vtype(ix)  = 0.0
+             !--- stype
+             Sfcprop(nb)%stype(ix)  = 0.0
+             !--- uustar
+             Sfcprop(nb)%uustar(ix) = 0.5
+             !--- ffmm
+             Sfcprop(nb)%ffmm(ix)   = 10.
+             !--- ffhh
+             Sfcprop(nb)%ffhh(ix)   = 10.
+             !--- hice
+             Sfcprop(nb)%hice(ix)   = 0.0
+             !--- fice
+             Sfcprop(nb)%fice(ix)   = 0.0
+             !--- tisfc
+             Sfcprop(nb)%tisfc(ix)  = Sfcprop(nb)%tsfc(ix)
+             !--- tprcp
+             Sfcprop(nb)%tprcp(ix)  = 0.0
+             !--- srflag
+             Sfcprop(nb)%srflag(ix) = 0.0
+             !--- snowd (snwdph in the file)
+             Sfcprop(nb)%snowd(ix)  = 0.0
+             !--- shdmin
+             Sfcprop(nb)%shdmin(ix) = 0.0 !this and the next depend on the
+             !--- shdmax
+             Sfcprop(nb)%shdmax(ix) = 0.0
+             !--- slope
+             Sfcprop(nb)%slope(ix)  = 0.0 ! also land-surface dependent
+             !--- snoalb
+             Sfcprop(nb)%snoalb(ix) = 0.0
+             !--- sncovr
+             Sfcprop(nb)%sncovr(ix) = 0.0
+             !
+          if ((Model%nstf_name(1) > 0) .and. (Model%nstf_name(2) == 1)) then
+               !--- nsstm tref
+                Sfcprop(nb)%tref(ix)    = Sfcprop(nb)%tsfc(ix)
+                Sfcprop(nb)%xz(ix)      = 30.0d0
+             endif
+             if ((Model%nstf_name(1) > 0) .and. (Model%nstf_name(2) == 0)) then
+                !return an error
+                call mpp_error(FATAL, 'cold-starting does not support NSST.')
+             endif
+
+             !--- 3D variables
+             ! these are all set to ocean values.
+                !--- stc
+                Sfcprop(nb)%stc(ix,:) = Sfcprop(nb)%tsfc(ix)
+                !--- smc
+                Sfcprop(nb)%smc(ix,:) = 1.0
+                !--- slc
+                Sfcprop(nb)%slc(ix,:) = 1.0
+          enddo
+       enddo
+      end if ! lidealland
+ end
+
+
 
   !>@ Destructor for phy_data_type
   subroutine phy_data_final(phy)
