@@ -4223,23 +4223,6 @@ module post_fv3
         enddo
       enddo
 
-      do l=lm,1,-1
-!$omp parallel do default(none) private(i,j) shared(l,jsta,jend,omga,wh,dpres,zint,spval,ista,iend)
-        do j=jsta,jend
-          do i=ista,iend
-            if(wh(i,j,l) /= spval) then
-              omga(i,j,l) = (-1.) * wh(i,j,l) * dpres(i,j,l)/zint(i,j,l)
-              zint(i,j,l) = zint(i,j,l) + zint(i,j,l+1)
-            else
-              omga(i,j,l) = spval
-              zint(i,j,l) = spval
-            endif
-          enddo
-        enddo
-      enddo
-!      print *,'in post_lam,omga 3d=',maxval(omga(ista:iend,jsta:jend,1)),minval(omga(ista:iend,jsta:jend,1)), &
-!           'lm=',maxval(omga(ista:iend,jsta:jend,lm)),minval(omga(ista:iend,jsta:jend,lm))
-
 ! compute pint from top down
 !$omp parallel do default(none) private(i,j) shared(jsta,jend,ak5,pint,ista,iend)
       do j=jsta,jend
@@ -4297,6 +4280,32 @@ module post_fv3
           end do
         end do
       end do
+
+! compute zint
+      do l=lm,1,-1
+!$omp parallel do default(none) private(i,j) shared(l,jsta,jend,omga,wh,q,dpres,zint,alpint,t,spval,ista,iend)
+        do j=jsta,jend
+          do i=ista,iend
+            if(wh(i,j,l) /= spval) then
+              omga(i,j,l) = (-1.) * wh(i,j,l) * dpres(i,j,l)/zint(i,j,l)
+              zint(i,j,l) = zint(i,j,l) + zint(i,j,l+1)
+            else
+              omga(i,j,l) = spval
+              if(zint(i,j,l+1) /=spval .and. t(i,j,l) /= spval .and. alpint(i,j,l+1) /= spval  &
+                      .and. alpint(i,j,l) /=spval .and. q(i,j,l) /= spval ) then
+                zint(i,j,l) = zint(i,j,l+1)+(rgas/grav)*t(i,j,l)*(1.+fv*q(i,j,l))*(alpint(i,j,l+1)-alpint(i,j,l))
+              else
+                zint(i,j,l) = spval
+              endif
+            endif
+
+
+          enddo
+        enddo
+      enddo
+!      print *,'in post_lam,omga 3d=',maxval(omga(ista:iend,jsta:jend,1)),minval(omga(ista:iend,jsta:jend,1)), &
+!           'lm=',maxval(omga(ista:iend,jsta:jend,lm)),minval(omga(ista:iend,jsta:jend,lm))
+
 
 ! compute zmid
       do l=lm,1,-1
