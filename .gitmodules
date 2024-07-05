@@ -9,8 +9,8 @@
 [submodule "ccpp/physics"]
   path = ccpp/physics
   #url = https://github.com/ufs-community/ccpp-physics
-  url = https://github.com/lisa-bengtsson/ccpp-physics
-  branch = ufs/dev
+  url = https://github.com/XiaqiongZhou-NOAA/ccpp-physics
+  branch = sigcld
 [submodule "upp"]
   path = upp
   url = https://github.com/NOAA-EMC/UPP
